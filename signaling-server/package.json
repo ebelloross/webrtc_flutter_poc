@@ -1,0 +1,14 @@
+{
+  "name": "signaling-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WebSocket signaling server for Flutter WebRTC POC",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "start:dev": "node index.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}
