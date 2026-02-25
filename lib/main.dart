@@ -4,6 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+enum ConnectionStatus {
+  disconnected,
+  connecting,
+  connected,
+  inCall,
+  error,
+}
+
 void main() {
   runApp(const MyApp());
 }
@@ -36,7 +44,8 @@ class _CallPageState extends State<CallPage> {
   MediaStream? _localStream;
   WebSocketChannel? _channel;
 
-  bool _connected = false;
+  ConnectionStatus _status = ConnectionStatus.disconnected;
+  final List<String> _logs = [];
 
   @override
   void dispose() {
@@ -55,10 +64,14 @@ class _CallPageState extends State<CallPage> {
       return;
     }
 
+    _setStatus(ConnectionStatus.connecting, 'Conectando a $serverUrl');
+
     _channel = WebSocketChannel.connect(Uri.parse(serverUrl));
     _channel!.stream.listen((message) async {
       final data = jsonDecode(message as String);
       if (data['room'] != roomId) return;
+
+      _addLog('WS: ${data['type']}');
 
       switch (data['type']) {
         case 'offer':
@@ -68,11 +81,13 @@ class _CallPageState extends State<CallPage> {
           final answer = await _peerConnection!.createAnswer();
           await _peerConnection!.setLocalDescription(answer);
           _send({'type': 'answer', 'sdp': answer.sdp, 'room': roomId});
+          _setStatus(ConnectionStatus.inCall, 'Recibida offer, enviando answer');
           break;
         case 'answer':
           await _peerConnection?.setRemoteDescription(
             RTCSessionDescription(data['sdp'], 'answer'),
           );
+          _setStatus(ConnectionStatus.inCall, 'Answer recibido');
           break;
         case 'candidate':
           final cand = data['candidate'];
@@ -82,9 +97,16 @@ class _CallPageState extends State<CallPage> {
           break;
       }
     }, onError: (error) {
+      _setStatus(ConnectionStatus.error, 'Error WebSocket: $error');
       _showSnackBar('Error WebSocket: $error');
+    }, onDone: () {
+      _addLog('WS: conexión cerrada');
+      if (mounted) {
+        _setStatus(ConnectionStatus.disconnected, 'WebSocket cerrado');
+      }
     });
 
+    _addLog('Solicitando micrófono');
     _localStream = await navigator.mediaDevices.getUserMedia({
       'audio': true,
       'video': false,
@@ -115,7 +137,26 @@ class _CallPageState extends State<CallPage> {
       }
     };
 
-    setState(() => _connected = true);
+    _peerConnection!.onIceConnectionState = (state) {
+      _addLog('ICE: $state');
+    };
+
+    _peerConnection!.onConnectionState = (state) {
+      _addLog('PC: $state');
+      if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        _setStatus(ConnectionStatus.inCall, 'Conectado');
+      }
+      if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
+          state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
+        _setStatus(ConnectionStatus.error, 'Conexión fallida');
+      }
+    };
+
+    _peerConnection!.onSignalingState = (state) {
+      _addLog('Signaling: $state');
+    };
+
+    _setStatus(ConnectionStatus.connected, 'Listo para iniciar llamada');
   }
 
   Future<void> _startCall() async {
@@ -125,6 +166,7 @@ class _CallPageState extends State<CallPage> {
     final offer = await _peerConnection!.createOffer();
     await _peerConnection!.setLocalDescription(offer);
     _send({'type': 'offer', 'sdp': offer.sdp, 'room': roomId});
+    _setStatus(ConnectionStatus.inCall, 'Offer enviado');
   }
 
   void _send(Map<String, dynamic> data) {
@@ -142,7 +184,58 @@ class _CallPageState extends State<CallPage> {
     _channel = null;
 
     if (mounted) {
-      setState(() => _connected = false);
+      _setStatus(ConnectionStatus.disconnected, 'Desconectado');
+    }
+  }
+
+  void _addLog(String message) {
+    final timestamp = DateTime.now().toIso8601String();
+    if (!mounted) return;
+    setState(() {
+      _logs.insert(0, '[$timestamp] $message');
+    });
+  }
+
+  void _clearLogs() {
+    if (!mounted) return;
+    setState(_logs.clear);
+  }
+
+  void _setStatus(ConnectionStatus status, String message) {
+    if (!mounted) return;
+    setState(() {
+      _status = status;
+      _logs.insert(0, '[${DateTime.now().toIso8601String()}] $message');
+    });
+  }
+
+  String get _statusLabel {
+    switch (_status) {
+      case ConnectionStatus.disconnected:
+        return 'Desconectado';
+      case ConnectionStatus.connecting:
+        return 'Conectando';
+      case ConnectionStatus.connected:
+        return 'Conectado';
+      case ConnectionStatus.inCall:
+        return 'En llamada';
+      case ConnectionStatus.error:
+        return 'Error';
+    }
+  }
+
+  Color get _statusColor {
+    switch (_status) {
+      case ConnectionStatus.disconnected:
+        return Colors.grey;
+      case ConnectionStatus.connecting:
+        return Colors.orange;
+      case ConnectionStatus.connected:
+        return Colors.green;
+      case ConnectionStatus.inCall:
+        return Colors.blue;
+      case ConnectionStatus.error:
+        return Colors.red;
     }
   }
 
@@ -169,22 +262,78 @@ class _CallPageState extends State<CallPage> {
               controller: _roomIdController,
               decoration: const InputDecoration(labelText: 'Room ID'),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Text('Estado:'),
+                const SizedBox(width: 8),
+                Chip(
+                  label: Text(_statusLabel),
+                  backgroundColor: _statusColor.withOpacity(0.15),
+                  labelStyle: TextStyle(color: _statusColor),
+                  side: BorderSide(color: _statusColor.withOpacity(0.4)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             FilledButton(
-              onPressed: _connected ? null : _connect,
+              onPressed: _status == ConnectionStatus.connecting ||
+                      _status == ConnectionStatus.connected ||
+                      _status == ConnectionStatus.inCall
+                  ? null
+                  : _connect,
               child: const Text('Conectar'),
             ),
             const SizedBox(height: 12),
             FilledButton.tonal(
-              onPressed: _connected ? _startCall : null,
+              onPressed: _status == ConnectionStatus.connected ||
+                      _status == ConnectionStatus.inCall
+                  ? _startCall
+                  : null,
               child: const Text('Llamar (crear offer)'),
             ),
             const SizedBox(height: 12),
             OutlinedButton(
-              onPressed: _connected ? _cleanup : null,
+              onPressed: _status == ConnectionStatus.disconnected ? null : _cleanup,
               child: const Text('Colgar'),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Logs'),
+                TextButton.icon(
+                  onPressed: _logs.isEmpty ? null : _clearLogs,
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Limpiar'),
+                ),
+              ],
+            ),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: _logs.isEmpty
+                    ? const Center(child: Text('Sin eventos aún'))
+                    : ListView.builder(
+                        reverse: true,
+                        itemCount: _logs.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Text(
+                              _logs[index],
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ),
+            const SizedBox(height: 12),
             const Text(
               'Usa el mismo Room ID en dos dispositivos. '
               'Pulsa Conectar en ambos y luego Llamar en uno de ellos.',
