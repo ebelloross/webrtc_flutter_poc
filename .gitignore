@@ -1,0 +1,16 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Mac/Windows
+.DS_Store
+Thumbs.db
+
+# Node
+signaling-server/node_modules/
