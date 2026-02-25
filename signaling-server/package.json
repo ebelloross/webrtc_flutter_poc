@@ -1,0 +1,1 @@
+{\n  "name": "signaling-server",\n  "version": "1.0.0",\n  "private": true,\n  "description": "WebSocket signaling server for Flutter WebRTC POC",\n  "main": "index.js",\n  "scripts": {\n    "start": "node index.js"\n  },\n  "dependencies": {\n    "ws": "^8.16.0"\n  }\n}
