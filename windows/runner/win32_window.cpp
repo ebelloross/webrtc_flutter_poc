@@ -135,13 +135,29 @@ bool Win32Window::Create(const std::wstring& title,
   double scale_factor = dpi / 96.0;
 
   HWND window = CreateWindow(
-      window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
+      window_class, title.c_str(),
+      // WS_OVERLAPPEDWINDOW sin WS_MAXIMIZEBOX → no se puede maximizar
+      WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
       Scale(size.width, scale_factor), Scale(size.height, scale_factor),
       nullptr, nullptr, GetModuleHandle(nullptr), this);
 
   if (!window) {
     return false;
+  }
+
+  // ── Centra la ventana en el monitor ───────────────────────────────────
+  MONITORINFO mi = {};
+  mi.cbSize = sizeof(mi);
+  if (GetMonitorInfo(monitor, &mi)) {
+    int screenW = mi.rcWork.right  - mi.rcWork.left;
+    int screenH = mi.rcWork.bottom - mi.rcWork.top;
+    int winW    = Scale(size.width,  scale_factor);
+    int winH    = Scale(size.height, scale_factor);
+    int posX    = mi.rcWork.left + (screenW - winW) / 2;
+    int posY    = mi.rcWork.top  + (screenH - winH) / 2;
+    SetWindowPos(window, nullptr, posX, posY, winW, winH,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
   }
 
   UpdateTheme(window);
@@ -186,6 +202,28 @@ Win32Window::MessageHandler(HWND hwnd,
         PostQuitMessage(0);
       }
       return 0;
+
+    case WM_GETMINMAXINFO: {
+      // Fija tamaño mínimo y máximo para mantener proporciones de móvil.
+      // Estos valores son en píxeles físicos; usamos GetDpiForWindow para escalar.
+      UINT dpi = GetDpiForWindow(hwnd);
+      double scale = dpi / 96.0;
+      int minW = static_cast<int>(380 * scale);
+      int minH = static_cast<int>(700 * scale);
+      int maxW = static_cast<int>(500 * scale);
+      int maxH = static_cast<int>(960 * scale);
+      auto* mmi = reinterpret_cast<MINMAXINFO*>(lparam);
+      mmi->ptMinTrackSize = {minW, minH};
+      mmi->ptMaxTrackSize = {maxW, maxH};
+      return 0;
+    }
+
+    case WM_SYSCOMMAND:
+      // Bloquea SC_MAXIMIZE (doble click en barra de título o menú sistema)
+      if ((wparam & 0xFFF0) == SC_MAXIMIZE) {
+        return 0;
+      }
+      break;
 
     case WM_DPICHANGED: {
       auto newRectSize = reinterpret_cast<RECT*>(lparam);

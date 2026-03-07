@@ -54,8 +54,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
-  Win32Window::Size size(1280, 720);
-  if (!window.Create(L"poc_webrtc_zonitel", origin, size)) {
+  // Tamaño tipo móvil: 430 × 860 px lógicos (similar a iPhone 14 Pro)
+  Win32Window::Size size(430, 860);
+  if (!window.Create(L"Zonitel", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);
