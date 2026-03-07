@@ -4,6 +4,11 @@ import 'package:sip_ua/sip_ua.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'app_properties.dart';
 
+// Plataformas móviles que soportan setSpeakerphoneOn
+bool get _isMobilePlatform =>
+    defaultTargetPlatform == TargetPlatform.android ||
+    defaultTargetPlatform == TargetPlatform.iOS;
+
 /// Estado de registro SIP.
 enum RegStatus { none, connecting, registered, unregistered, failed }
 
@@ -134,13 +139,15 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
     }
   }
 
-  /// Alterna altavoz / auricular.
+  /// Alterna altavoz / auricular (solo Android e iOS).
   Future<void> toggleSpeaker() async {
     isSpeaker = !isSpeaker;
-    try {
-      await webrtc.Helper.setSpeakerphoneOn(isSpeaker);
-    } catch (e) {
-      debugPrint('[SIP] setSpeakerphoneOn error: $e');
+    if (_isMobilePlatform) {
+      try {
+        await webrtc.Helper.setSpeakerphoneOn(isSpeaker);
+      } catch (e) {
+        debugPrint('[SIP] setSpeakerphoneOn error: $e');
+      }
     }
     notifyListeners();
   }
@@ -233,7 +240,9 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
         isOnHold = false;
         if (isSpeaker) {
           isSpeaker = false;
-          webrtc.Helper.setSpeakerphoneOn(false).ignore();
+          if (_isMobilePlatform) {
+            webrtc.Helper.setSpeakerphoneOn(false).ignore();
+          }
         }
         break;
 

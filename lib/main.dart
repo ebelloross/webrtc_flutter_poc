@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'app_config.dart';
 import 'sip_service.dart';
 import 'settings_page.dart';
@@ -294,7 +295,7 @@ class _ActiveCallControls extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // ── Fila superior: Mute · Altavoz · Hold ────────────────────────
+        // ── Fila superior: Mute · Altavoz (solo móvil) · Hold ───────────
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
@@ -305,15 +306,18 @@ class _ActiveCallControls extends StatelessWidget {
               activeColor: Colors.orange,
               onTap: onMute,
             ),
-            _ControlButton(
-              icon: sip.isSpeaker
-                  ? Icons.volume_up_rounded
-                  : Icons.volume_down_rounded,
-              label: sip.isSpeaker ? 'Auricular' : 'Altavoz',
-              active: sip.isSpeaker,
-              activeColor: Colors.blue,
-              onTap: onSpeaker,
-            ),
+            // Altavoz solo disponible en Android e iOS
+            if (defaultTargetPlatform == TargetPlatform.android ||
+                defaultTargetPlatform == TargetPlatform.iOS)
+              _ControlButton(
+                icon: sip.isSpeaker
+                    ? Icons.volume_up_rounded
+                    : Icons.volume_down_rounded,
+                label: sip.isSpeaker ? 'Auricular' : 'Altavoz',
+                active: sip.isSpeaker,
+                activeColor: Colors.blue,
+                onTap: onSpeaker,
+              ),
             _ControlButton(
               icon: isHeld
                   ? Icons.play_circle_outline_rounded
