@@ -110,8 +110,37 @@ class _HomePageState extends State<HomePage> {
       _snack('Debes registrarte primero en Configuración');
       return;
     }
+    // Verifica dispositivo de audio antes de llamar
+    final audioError = await _sip.checkAudioDevice();
+    if (audioError != null) {
+      if (mounted) _showNoMicDialog(audioError);
+      return;
+    }
     final ok = await _sip.call(callee);
     if (!ok && mounted) _snack('No se pudo iniciar la llamada');
+  }
+
+  void _showNoMicDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.mic_off_rounded, color: Colors.redAccent),
+            SizedBox(width: 8),
+            Text('Sin micrófono'),
+          ],
+        ),
+        content: Text(message, style: const TextStyle(height: 1.5)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _hangUp() => _sip.hangUp();

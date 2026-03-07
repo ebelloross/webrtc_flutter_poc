@@ -101,6 +101,24 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
 
   // ── Llamadas ──────────────────────────────────────────────────────────────
 
+  /// Verifica si hay al menos un dispositivo de entrada de audio disponible.
+  /// Retorna `null` si hay dispositivo, o un mensaje de error si no hay.
+  Future<String?> checkAudioDevice() async {
+    try {
+      final devices = await webrtc.navigator.mediaDevices.enumerateDevices();
+      final hasAudioInput =
+          devices.any((d) => d.kind == 'audioinput' && d.deviceId.isNotEmpty);
+      if (!hasAudioInput) {
+        return 'No se detectó ningún micrófono en este dispositivo.\n'
+            'Conecta un micrófono o auriculares y vuelve a intentarlo.';
+      }
+      return null; // ok
+    } catch (e) {
+      debugPrint('[SIP] enumerateDevices error: $e');
+      return 'No se pudo acceder a los dispositivos de audio: $e';
+    }
+  }
+
   /// Inicia una llamada saliente de solo audio.
   Future<bool> call(String target) async {
     if (!_helper.registered) return false;
@@ -234,19 +252,22 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
       case CallStateEnum.ENDED:
         // Log detallado del fallo — útil para diagnosticar Windows getUserMedia
         if (state.state == CallStateEnum.FAILED) {
-          debugPrint(
-            '[SIP] Call FAILED — cause: ${state.cause?.cause ?? "unknown"} '
-            '| originator: ${state.originator}',
-          );
-          // En Windows, "User Denied Media Access" indica que el permiso
-          // de micrófono no está habilitado en Configuración > Privacidad.
-          if (state.cause?.cause?.contains('Media Access') == true ||
-              state.cause?.cause?.contains('getUserMedia') == true) {
-            debugPrint(
-              '[SIP][WINDOWS] Micrófono bloqueado por Windows Privacy API.\n'
-              '  → Ve a Configuración > Privacidad > Micrófono\n'
-              '  → Activa "Permitir que las apps de escritorio accedan al micrófono"',
-            );
+          final cause = state.cause?.cause ?? 'unknown';
+          debugPrint('[SIP] Call FAILED — cause: $cause | originator: ${state.originator}');
+
+          if (cause.contains('Media Access') || cause.contains('getUserMedia')) {
+            // Diagnóstico específico para Windows
+            checkAudioDevice().then((err) {
+              if (err != null) {
+                debugPrint('[SIP][WINDOWS] ❌ Sin dispositivo de audio: $err');
+              } else {
+                debugPrint(
+                  '[SIP][WINDOWS] ⚠️  Dispositivos OK pero getUserMedia falló.\n'
+                  '  → Ve a Configuración > Privacidad > Micrófono\n'
+                  '  → Activa "Permitir que las apps de escritorio accedan al micrófono"',
+                );
+              }
+            });
           }
         }
         activeCall = null;

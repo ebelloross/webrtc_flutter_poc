@@ -114,7 +114,49 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     }
   }
 
-  void _accept() {
+  void _accept() async {
+    // Verifica que haya micrófono disponible antes de responder
+    final audioError = await _sip.checkAudioDevice();
+    if (audioError != null) {
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          backgroundColor: const Color(0xFF1B2A4A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.mic_off_rounded, color: Colors.redAccent, size: 28),
+              SizedBox(width: 10),
+              Text(
+                'Sin micrófono',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+            ],
+          ),
+          content: Text(
+            audioError,
+            style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Rechaza la llamada automáticamente
+                _sip.hangUp();
+                _safeClose();
+              },
+              child: const Text(
+                'Rechazar llamada',
+                style: TextStyle(color: Colors.redAccent),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     _sip.answerCall();
     _safeClose();
   }
