@@ -239,18 +239,23 @@ class _HomePageState extends State<HomePage> {
               padding: EdgeInsets.zero,
             ),
           ),
+          // Diagnóstico de audio — solo Windows y macOS
+          if (defaultTargetPlatform == TargetPlatform.windows ||
+              defaultTargetPlatform == TargetPlatform.macOS)
+            Tooltip(
+              message: 'Diagnóstico de audio',
+              child: IconButton(
+                icon: const Icon(Icons.headset_rounded),
+                onPressed: () => Navigator.pushNamed(context, '/audio-devices'),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => Navigator.pushNamed(context, '/settings'),
           ),
         ],
       ),
-      // FAB de diagnóstico de audio — solo Windows y macOS
-      floatingActionButton: (defaultTargetPlatform == TargetPlatform.windows ||
-              defaultTargetPlatform == TargetPlatform.macOS)
-          ? _AudioDiagFab()
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: null,
       body: Column(
         children: [
           // Banner de estado de llamada
@@ -415,24 +420,7 @@ class _ActiveCallControls extends StatelessWidget {
   }
 }
 
-// ── FAB de diagnóstico de audio (Windows / macOS) ─────────────────────────
-
-class _AudioDiagFab extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: 'Diagnóstico de audio',
-      child: FloatingActionButton(
-        heroTag: 'audio_diag_fab',
-        onPressed: () => Navigator.pushNamed(context, '/audio-devices'),
-        backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-        foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
-        elevation: 4,
-        child: const Icon(Icons.headset_rounded, size: 26),
-      ),
-    );
-  }
-}
+// ── Botón de control individual ───────────────────────────────────────────
 
 class _ControlButton extends StatelessWidget {
   final IconData icon;
