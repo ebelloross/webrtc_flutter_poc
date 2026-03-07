@@ -232,6 +232,23 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
 
       case CallStateEnum.FAILED:
       case CallStateEnum.ENDED:
+        // Log detallado del fallo — útil para diagnosticar Windows getUserMedia
+        if (state.state == CallStateEnum.FAILED) {
+          debugPrint(
+            '[SIP] Call FAILED — cause: ${state.cause?.cause ?? "unknown"} '
+            '| originator: ${state.originator}',
+          );
+          // En Windows, "User Denied Media Access" indica que el permiso
+          // de micrófono no está habilitado en Configuración > Privacidad.
+          if (state.cause?.cause?.contains('Media Access') == true ||
+              state.cause?.cause?.contains('getUserMedia') == true) {
+            debugPrint(
+              '[SIP][WINDOWS] Micrófono bloqueado por Windows Privacy API.\n'
+              '  → Ve a Configuración > Privacidad > Micrófono\n'
+              '  → Activa "Permitir que las apps de escritorio accedan al micrófono"',
+            );
+          }
+        }
         activeCall = null;
         remoteIdentity = null;
         remoteStream = null;

@@ -8,6 +8,32 @@ import 'incoming_call_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Captura errores globales de Flutter (incluye InvalidStateError de WebRTC)
+  FlutterError.onError = (FlutterErrorDetails details) {
+    final msg = details.exception.toString();
+    // Filtra errores conocidos de WebRTC en Windows para no crashear la app
+    if (msg.contains('InvalidStateError') ||
+        msg.contains('getUserMediaFailed') ||
+        msg.contains('Missing extension byte')) {
+      debugPrint('[WebRTC][Windows] Error capturado: $msg');
+      return;
+    }
+    FlutterError.presentError(details);
+  };
+
+  // Captura errores en zonas asíncronas no manejadas
+  PlatformDispatcher.instance.onError = (error, stack) {
+    final msg = error.toString();
+    if (msg.contains('InvalidStateError') ||
+        msg.contains('getUserMediaFailed') ||
+        msg.contains('Missing extension byte')) {
+      debugPrint('[WebRTC][Windows] Async error capturado: $msg');
+      return true; // marca como manejado
+    }
+    return false;
+  };
+
   final config = AppConfig();
   await config.load();
   runApp(MyApp(config: config));
