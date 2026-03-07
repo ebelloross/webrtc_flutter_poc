@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'audio_device_service.dart';
 
@@ -162,6 +163,11 @@ class _AudioDevicesPageState extends State<AudioDevicesPage> {
           svc: _svc,
           onToggle: _toggleMicTest,
         ),
+
+        const SizedBox(height: 16),
+
+        // ── Panel de prueba de auriculares ─────────────────────────────
+        _SpeakerTestPanel(svc: _svc),
 
         const SizedBox(height: 32),
       ],
@@ -707,6 +713,268 @@ class _MicLevelIndicator extends StatelessWidget {
     final center = 0.5;
     final distance = (pos - center).abs();
     return 1.0 - distance * 1.4 * (1.0 - level * 0.5);
+  }
+}
+
+// ── Panel de prueba de auriculares ─────────────────────────────────────────
+
+class _SpeakerTestPanel extends StatelessWidget {
+  final AudioDeviceService svc;
+  const _SpeakerTestPanel({required this.svc});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isPlaying = svc.isSpeakerTesting;
+    final isDone    = svc.speakerTestStatus == SpeakerTestStatus.done;
+    final hasFailed = svc.speakerTestStatus == SpeakerTestStatus.failed;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Encabezado ────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
+              children: [
+                Icon(Icons.headphones_rounded, color: cs.secondary, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Prueba de Auriculares',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: cs.secondary,
+                  ),
+                ),
+                const Spacer(),
+                if (svc.selectedOutput != null)
+                  Flexible(
+                    child: Chip(
+                      label: Text(
+                        svc.selectedOutput!.displayLabel,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      avatar: Icon(Icons.headset_rounded,
+                          size: 14, color: cs.secondary),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // ── Descripción ───────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Reproduce un tono de 440 Hz (La central) durante 2.5 segundos '
+              'para verificar que los auriculares o altavoces funcionan correctamente.',
+              style: TextStyle(
+                fontSize: 12,
+                color: cs.onSurfaceVariant,
+                height: 1.4,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Visualizador de onda animado ──────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _SpeakerWaveVisualizer(isPlaying: isPlaying),
+          ),
+
+          const SizedBox(height: 12),
+
+          // ── Resultado ─────────────────────────────────────────────
+          if (isDone)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: Colors.green.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle_rounded,
+                        color: Colors.green, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      '¿Escuchaste el tono? Los auriculares funcionan correctamente.',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.green.shade700),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          if (hasFailed && svc.speakerTestError != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: cs.errorContainer.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.error_outline_rounded,
+                        color: cs.error, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        svc.speakerTestError!,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: cs.error,
+                            height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // ── Botón ─────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: isPlaying
+                  ? FilledButton.icon(
+                      onPressed: () => svc.stopSpeakerTest(),
+                      icon: const Icon(Icons.stop_rounded),
+                      label: const Text('Detener tono'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.red.shade600,
+                        minimumSize: const Size.fromHeight(46),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    )
+                  : FilledButton.icon(
+                      onPressed: svc.hasOutputDevice || true
+                          ? () => svc.startSpeakerTest()
+                          : null,
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: const Text('Reproducir tono de prueba'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: cs.secondary,
+                        foregroundColor: cs.onSecondary,
+                        minimumSize: const Size.fromHeight(46),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Visualizador de onda para auriculares ──────────────────────────────────
+
+class _SpeakerWaveVisualizer extends StatefulWidget {
+  final bool isPlaying;
+  const _SpeakerWaveVisualizer({required this.isPlaying});
+
+  @override
+  State<_SpeakerWaveVisualizer> createState() =>
+      _SpeakerWaveVisualizerState();
+}
+
+class _SpeakerWaveVisualizerState extends State<_SpeakerWaveVisualizer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    if (widget.isPlaying) _ctrl.repeat();
+  }
+
+  @override
+  void didUpdateWidget(_SpeakerWaveVisualizer old) {
+    super.didUpdateWidget(old);
+    if (widget.isPlaying && !_ctrl.isAnimating) {
+      _ctrl.repeat();
+    } else if (!widget.isPlaying && _ctrl.isAnimating) {
+      _ctrl.stop();
+      _ctrl.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        return SizedBox(
+          height: 48,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: List.generate(32, (i) {
+              final phase = _ctrl.value * 2 * pi;
+              final freq = 2.0 + (i % 4) * 0.5;
+              final rawH = widget.isPlaying
+                  ? (sin(phase * freq + i * 0.4).abs() * 0.8 + 0.15)
+                  : 0.06;
+              final h = rawH.clamp(0.05, 1.0);
+
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 60),
+                    height: 48 * h,
+                    decoration: BoxDecoration(
+                      color: widget.isPlaying
+                          ? cs.secondary.withValues(alpha: 0.4 + 0.5 * h)
+                          : cs.outline.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        );
+      },
+    );
   }
 }
 
