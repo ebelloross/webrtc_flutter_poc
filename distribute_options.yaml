@@ -1,0 +1,30 @@
+# Configuración para flutter_distributor
+# Ejecutar en Windows: flutter_distributor package --platform windows --targets exe
+# Requiere: dart pub global activate flutter_distributor
+#           NSIS instalado (https://nsis.sourceforge.io/Download)
+
+name: Zonitel
+version: 1.0.0
+
+output: dist/
+
+platforms:
+  windows:
+    # Genera instalador .exe con NSIS
+    targets:
+      - exe
+    build_args:
+      # Argumentos pasados a flutter build windows
+      - --release
+    distributable:
+      # Información del instalador NSIS
+      display_name: Zonitel Softphone
+      publisher: Zonitel
+      publisher_url: https://zonitel.com
+      # Icono del instalador (opcional — agregar en assets/icons/app_icon.ico)
+      # install_icon: assets/icons/app_icon.ico
+      install_directory: Zonitel
+      shortcuts:
+        desktop: true
+        start_menu: true
+
