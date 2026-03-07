@@ -5,6 +5,7 @@ import 'sip_service.dart';
 import 'settings_page.dart';
 import 'splash_screen.dart';
 import 'incoming_call_screen.dart';
+import 'audio_devices_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,6 +56,7 @@ class MyApp extends StatelessWidget {
         '/': (_) => SplashScreen(config: config),
         '/home': (_) => HomePage(config: config),
         '/settings': (_) => SettingsPage(config: config),
+        '/audio-devices': (_) => const AudioDevicesPage(),
       },
     );
   }
@@ -243,6 +245,12 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
+      // FAB de diagnóstico de audio — solo Windows y macOS
+      floatingActionButton: (defaultTargetPlatform == TargetPlatform.windows ||
+              defaultTargetPlatform == TargetPlatform.macOS)
+          ? _AudioDiagFab()
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: Column(
         children: [
           // Banner de estado de llamada
@@ -407,7 +415,24 @@ class _ActiveCallControls extends StatelessWidget {
   }
 }
 
-// ── Botón de control individual ───────────────────────────────────────────
+// ── FAB de diagnóstico de audio (Windows / macOS) ─────────────────────────
+
+class _AudioDiagFab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Diagnóstico de audio',
+      child: FloatingActionButton(
+        heroTag: 'audio_diag_fab',
+        onPressed: () => Navigator.pushNamed(context, '/audio-devices'),
+        backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+        foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
+        elevation: 4,
+        child: const Icon(Icons.headset_rounded, size: 26),
+      ),
+    );
+  }
+}
 
 class _ControlButton extends StatelessWidget {
   final IconData icon;
